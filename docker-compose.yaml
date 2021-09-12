@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+        influx:
+                image: influxdb:2.0.8
+                volumes:
+                        - ./data:/var/influxdb
+                ports:
+                        - "8086:8086"
+        inverter_read:
+                build: inverter
+                depends_on:
+                        - influx
+        energy_meter_read:
+                build: energy_meter
+                depends_on:
+                        - influx
+
