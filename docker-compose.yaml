@@ -15,4 +15,6 @@ services:
                 build: energy_meter
                 depends_on:
                         - influx
+        backup:
+                build: backup
 
