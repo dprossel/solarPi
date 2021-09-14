@@ -7,14 +7,17 @@ services:
                         - ./data:/var/influxdb
                 ports:
                         - "8086:8086"
-        inverter_read:
-                build: inverter
+                restart: unless-stopped
+        combined_read:
+                build: combined
                 depends_on:
                         - influx
-        energy_meter_read:
-                build: energy_meter
-                depends_on:
-                        - influx
+                devices:
+                    "/dev/ttyUSB0":"/dev/ttyUSB0"
+                restart: unless-stopped
         backup:
                 build: backup
+                restart: unless-stopped
+volumes:
+    db-data:
 

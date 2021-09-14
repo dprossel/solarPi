@@ -1,0 +1,4 @@
+sdm_modbus==0.4.6
+influxdb-client==1.20.0
+rx==3.2.0
+

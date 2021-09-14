@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+        influx:
+                image: influxdb:2.0.8
+                volumes:
+                        - db-data:/var/influxdb
+                ports:
+                        - "8086:8086"
+                restart: unless-stopped
+        sdm_read:
+                build: sdm
+                depends_on:
+                        - influx
+                devices:
+                        - "/dev/ttyUSB0:/dev/ttyUSB0"
+                restart: unless-stopped
+        backup:
+                build: backup
+                restart: unless-stopped
+volumes:
+    db-data:
+
