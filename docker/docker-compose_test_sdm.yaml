@@ -4,7 +4,7 @@ services:
         influx:
                 image: influxdb:2.0.8
                 volumes:
-                        - db-data:/var/influxdb
+                        - test-db-data:/var/influxdb
                 ports:
                         - "8086:8086"
                 restart: unless-stopped
@@ -18,5 +18,5 @@ services:
                 env_file: 
                         - solarpi.env
 volumes:
-    db-data:
+    test-db-data:
 
