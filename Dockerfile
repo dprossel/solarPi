@@ -1,13 +1,18 @@
 # syntax=docker/dockerfile:1
 FROM python:3
 
-RUN groupadd -g 999 solarpiuser && useradd -r -u 999 -g solarpiuser solarpiuser
-USER solarpiuser
+RUN groupadd -g 999 solarpi &&\
+    useradd -r -u 999 -g solarpi solarpi &&\
+    mkdir -p /home/solarpi &&\
+    chown -R solarpi:solarpi /home/solarpi
+USER solarpi
 
 ENV PYTHONUNBUFFERED=1
-WORKDIR /solarpi
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-RUN pip install . && rm -rf *
+ENV PATH="/home/solarpi/.local/bin:${PATH}"
+
+WORKDIR /home/solarpi
+COPY --chown=solarpi:solarpi requirements.txt .
+RUN pip install --user -r requirements.txt
+COPY --chown=solarpi:solarpi . .
+RUN pip install --user . && rm -rf * .git* .cache
 
