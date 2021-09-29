@@ -1,78 +1,36 @@
 #!/usr/bin/env python3
-
-import atexit
-from datetime import timedelta
-from threading import Lock
-
-import rx
-from rx import operators as ops
-
-from influxdb_client import Point, InfluxDBClient, WriteApi, WriteOptions
+import serial
+from solarpi import (get_sdm_energy_values_observable, log_observable_to_influx_db,
+                     InfluxDbParams, get_inverter_values_observable, get_combined_observable)
+import solarpi
+from solarpi.utils import get_environment_variables
+from sdm_modbus import SDM630
 
 
-INFLUXDB_URL = "http://localhost:8086"
-INFLUXDB_TOKEN = ""
-INFLUXDB_ORG = "prossel"
-INFLUXDB_BUCKET = "solarpi"
+def main():
+    env = get_environment_variables(
+        ["INFLUXDB_URL", "INFLUXDB_TOKEN", "INFLUXDB_ORG", "INFLUXDB_BUCKET", "SERIAL_DEVICE", "SERIAL_BAUDRATE", "SDM_INTERVAL"])
+
+    influx_params = InfluxDbParams(url=env["INFLUXDB_URL"], token=env["INFLUXDB_TOKEN"],
+                                   organisation=env["INFLUXDB_ORG"], bucket=env["INFLUXDB_BUCKET"])
+
+    serial_port = solarpi.ThreadSafeSerial(port=env["SDM_DEVICE"], baudrate=env["SDM_BAUDRATE"])
+
+    sdm = SDM630(device=env["SERIAL_DEVICE"], baud=env["SERIAL_BAUDRATE"])
+    sdm.client.socket = serial_port
+
+    inverter1 = solarpi.KacoPowadorRs485(serial_port, env["INV1_PORT"])
+    inverter2 = solarpi.KacoPowadorRs485(serial_port, env["INV2_PORT"])
+
+    serial_port.open()
+
+    sdm_obs = get_sdm_energy_values_observable(sdm, env["SDM_INTERVAL"])
+    inv1_obs = get_inverter_values_observable(inverter1, env["INV1_INTERVAL"])
+    inv2_obs = get_inverter_values_observable(inverter2, env["INV2_INTERVAL"])
+
+    log_observable_to_influx_db(get_combined_observable(
+        [sdm_obs, inv1_obs, inv2_obs]), influx_params)
 
 
-def on_exit(db_client: InfluxDBClient, write_api: WriteApi):
-    """Close clients after terminate a script.
-    :param db_client: InfluxDB client
-    :param write_api: WriteApi
-    :return: nothing
-    """
-    write_api.close()
-    db_client.close()
-
-
-def read_sdm_energy_values():
-    """Read relevant energy values from SDM.
-    """
-    with socket_lock:
-        return [1, 2, 3]
-
-
-def read_inverter_values():
-    with socket_lock:
-        pass
-
-
-def line_protocol(measurements):
-    """Create a InfluxDB line protocol with structure:
-        iot_sensor,hostname=mine_sensor_12,type=temperature value=68
-    :param temperature: the sensor temperature
-    :return: Line protocol to write into InfluxDB
-    """
-
-    return Point("financial-analysis") \
-        .tag("type", "vix-daily") \
-        .field("open", float(measurements['VIX Open'])) \
-        .field("high", float(measurements['VIX High'])) \
-        .field("low", float(measurements['VIX Low'])) \
-        .field("close", float(measurements['VIX Close'])) \
-        .time(measurements['Date'])
-
-
-socket_lock = Lock()
-
-energy_data = rx \
-    .interval(period=timedelta(seconds=60)) \
-    .pipe(ops.map(lambda t: read_sdm_energy_values()),
-          ops.distinct_until_changed(),
-          ops.map(lambda temperature: line_protocol(temperature)))
-
-inverter_data = rx \
-    .interval(period=timedelta(seconds=60)) \
-    .pipe(ops.map(lambda t: read_inverter_values()),
-          ops.distinct_until_changed(),
-          ops.map(lambda temperature: line_protocol(temperature)))
-
-data = rx.merge(energy_data, inverter_data)
-
-_db_client = InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG, debug=True)
-
-_write_api = _db_client.write_api(write_options=WriteOptions(batch_size=1))
-_write_api.write(bucket=INFLUXDB_BUCKET, record=data)
-
-atexit.register(on_exit, _db_client, _write_api)
+if __name__ == "__main__":
+    main()
