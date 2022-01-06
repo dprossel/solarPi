@@ -1,5 +1,6 @@
 import abc
 import datetime
+from os import read
 import rx
 from rx.core.typing import Observable
 import rx.operators as ops
@@ -10,6 +11,7 @@ from abc import ABC
 import serial
 import threading
 from functools import wraps
+import time
 
 import pdb
 
@@ -42,9 +44,14 @@ def _locking_io(cls):
 
 @_locking_io
 class ThreadSafeSerial(serial.Serial):
-    def __init__(self, port=None, baudrate=9600, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, timeout=None, xonxoff=False, rtscts=False, write_timeout=None, dsrdtr=False, inter_byte_timeout=None, exclusive=None, **kwargs):
-        super().__init__(port=port, baudrate=baudrate, bytesize=bytesize, parity=parity, stopbits=stopbits, timeout=timeout, xonxoff=xonxoff,
-                         rtscts=rtscts, write_timeout=write_timeout, dsrdtr=dsrdtr, inter_byte_timeout=inter_byte_timeout, exclusive=exclusive, **kwargs)
+    def __init__(self, port=None, baudrate=9600, bytesize=serial.EIGHTBITS,
+                 parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, timeout=None,
+                 xonxoff=False, rtscts=False, write_timeout=None, dsrdtr=False,
+                 inter_byte_timeout=None, exclusive=None, **kwargs):
+        super().__init__(
+            port=port, baudrate=baudrate, bytesize=bytesize, parity=parity, stopbits=stopbits,
+            timeout=timeout, xonxoff=xonxoff, rtscts=rtscts, write_timeout=write_timeout,
+            dsrdtr=dsrdtr, inter_byte_timeout=inter_byte_timeout, exclusive=exclusive, **kwargs)
         self.lock = threading.Lock()
 
 
@@ -52,11 +59,11 @@ class Inverter(ABC):
     name: str
 
     @abc.abstractmethod
-    def read_values():
+    def read_values(self):
         pass
 
 
-class KacoPowadorRs485(object):
+class KacoPowadorRs485(Inverter):
     RESPONSE_LENGTH = 17
     GET_ALL_CMD = 9
     bus_address: int
@@ -70,9 +77,33 @@ class KacoPowadorRs485(object):
 
     def read_values(self):
         self.write_command(self.GET_ALL_CMD)
-        self.serialPort.read(self.RESPONSE_LENGTH)
-        self.serialPort.close()
-        return {"ertrag": 0}
+        result = self.serialPort.read(self.RESPONSE_LENGTH)
+        if len(result) < 10:
+            time.sleep(1)
+            self.write_command(self.GET_ALL_CMD)
+            result = self.serialPort.read(self.RESPONSE_LENGTH)
+            if len(result) < 10:
+                return {"status": -1,
+                "generatorspannung": -1.0,
+                "generatorstrom": -1.0,
+                "generatorleistung": -1.0,
+                "netzspannung": -1.0,
+                "einspeisestrom": -1.0,
+                "einspeiseleistung": -1.0,
+                "temperatur": -1.0,
+                "tagesertrag": -1.0}
+
+        line = result.split("\r\n")[0]
+        values = line.split()[1:10]
+        return {"status": values[0],
+                "generatorspannung": values[1],
+                "generatorstrom": values[2]*1000,
+                "generatorleistung": values[3],
+                "netzspannung": values[4],
+                "einspeisestrom": values[5]*1000,
+                "einspeiseleistung": values[6],
+                "temperatur": values[7],
+                "tagesertrag": values[8]}
 
     def write_command(self, command: int):
         return self.serialPort.write("#{:02d}{}\r".format(self.bus_address, command))

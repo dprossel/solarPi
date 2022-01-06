@@ -3,24 +3,21 @@ import serial
 from solarpi import (get_sdm_energy_values_observable, log_observable_to_influx_db,
                      InfluxDbParams, get_inverter_values_observable, get_combined_observable)
 import solarpi
-from solarpi.utils import get_environment_variables
+from solarpi.utils import get_environment_variables, get_influxdb_params_from_env
 from sdm_modbus import SDM630
 
 
 def main():
-    env = get_environment_variables(
-        ["INFLUXDB_URL", "INFLUXDB_TOKEN", "INFLUXDB_ORG", "INFLUXDB_BUCKET", "SERIAL_DEVICE", "SERIAL_BAUDRATE", "SDM_INTERVAL"])
+    env = get_environment_variables(["SERIAL_DEVICE", "SERIAL_BAUDRATE", "SDM_INTERVAL"])
+    influx_params = get_influxdb_params_from_env()
 
-    influx_params = InfluxDbParams(url=env["INFLUXDB_URL"], token=env["INFLUXDB_TOKEN"],
-                                   organisation=env["INFLUXDB_ORG"], bucket=env["INFLUXDB_BUCKET"])
-
-    serial_port = solarpi.ThreadSafeSerial(port=env["SDM_DEVICE"], baudrate=env["SDM_BAUDRATE"])
+    serial_port = solarpi.ThreadSafeSerial(port=env["SERIAL_DEVICE"], baudrate=env["SERIAL_BAUDRATE"])
 
     sdm = SDM630(device=env["SERIAL_DEVICE"], baud=env["SERIAL_BAUDRATE"])
     sdm.client.socket = serial_port
 
-    inverter1 = solarpi.KacoPowadorRs485(serial_port, env["INV1_PORT"])
-    inverter2 = solarpi.KacoPowadorRs485(serial_port, env["INV2_PORT"])
+    inverter1 = solarpi.KacoPowadorRs485(serial_port, env["INV1_ADDR"])
+    inverter2 = solarpi.KacoPowadorRs485(serial_port, env["INV2_ADDR"])
 
     serial_port.open()
 
