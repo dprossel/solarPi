@@ -1,6 +1,5 @@
 import abc
 import datetime
-from os import read
 import rx
 from rx.core.typing import Observable
 import rx.operators as ops
@@ -10,10 +9,8 @@ from dataclasses import dataclass
 from abc import ABC
 import serial
 import threading
-from functools import wraps
 import time
 
-import pdb
 
 
 @dataclass
@@ -78,8 +75,11 @@ class KacoPowadorRs485(Inverter):
 
     def _do_read_values(self):
         self.write_command(self.GET_ALL_CMD)
+        time.sleep(0.5) # wait for result to be ready?
         result = self.serialPort.read(self.RESPONSE_LENGTH)
-        if len(result) < 10:
+        if len(result) == 0:
+            return ""
+        elif len(result) < 10:
             time.sleep(1)
             self.write_command(self.GET_ALL_CMD)
             result = self.serialPort.read(self.RESPONSE_LENGTH)
