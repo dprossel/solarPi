@@ -13,4 +13,4 @@ def get_environment_variables(variables: list):
         sys.exit(1)
 
 def get_influxdb_params_from_env():
-    return InfluxDbParams(*(get_environment_variables("INFLUXDB_URL", "INFLUXDB_TOKEN", "INFLUXDB_ORG", "INFLUXDB_BUCKET").values))
+    return InfluxDbParams(*(get_environment_variables(["INFLUXDB_URL", "INFLUXDB_TOKEN", "INFLUXDB_ORG", "INFLUXDB_BUCKET"]).values()))

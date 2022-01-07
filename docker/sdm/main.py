@@ -11,9 +11,9 @@ def main():
     influx_params = InfluxDbParams(url=env["INFLUXDB_URL"], token=env["INFLUXDB_TOKEN"],
                                    organisation=env["INFLUXDB_ORG"], bucket=env["INFLUXDB_BUCKET"])
 
-    device = SDM630(device=env["SERIAL_DEVICE"], baud=env["SERIAL_BAUDRATE"])
+    device = SDM630(device=env["SERIAL_DEVICE"], baud=int(env["SERIAL_BAUDRATE"]), parity="N")
     log_observable_to_influx_db(get_sdm_energy_values_observable(
-        device, env["SDM_INTERVAL"]), influx_params)
+        device, float(env["SDM_INTERVAL"])), influx_params)
 
 
 if __name__ == "__main__":

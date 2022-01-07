@@ -1,10 +1,10 @@
-version: "3.9"
+version: "3.3"
 
 services:
         influx:
-                image: influxdb:2.0.8
+                image: influxdb:2.1
                 volumes:
-                        - test-db-data:/var/influxdb
+                        - test-db-data:/var/lib/influxdb2
                 ports:
                         - "8086:8086"
                 restart: unless-stopped
@@ -15,8 +15,9 @@ services:
                 #devices:
                 #        - "/dev/ttyUSB0:/dev/ttyUSB0"
                 restart: unless-stopped
-                env_file: 
+                stdin_open: true # docker run -i
+                tty: true
+                env_file:
                         - solarpi.env
 volumes:
-    test-db-data:
-
+        test-db-data:

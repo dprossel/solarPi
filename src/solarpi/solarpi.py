@@ -26,35 +26,6 @@ class InfluxDbParams:
     bucket: str
 
 
-def _lock_func(func):
-    @wraps(func)
-    def locking_wrapper(self, *args, **kwargs):
-        with self.lock:
-            return func(self, *args, **kwargs)
-    return locking_wrapper
-
-
-def _locking_io(cls):
-    for key in dir(cls):
-        if key in ["read", "write", "flush"]:
-            value = getattr(cls, key)
-            setattr(cls, key, _lock_func(value))
-    return cls
-
-
-@_locking_io
-class ThreadSafeSerial(serial.Serial):
-    def __init__(self, port=None, baudrate=9600, bytesize=serial.EIGHTBITS,
-                 parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, timeout=None,
-                 xonxoff=False, rtscts=False, write_timeout=None, dsrdtr=False,
-                 inter_byte_timeout=None, exclusive=None, **kwargs):
-        super().__init__(
-            port=port, baudrate=baudrate, bytesize=bytesize, parity=parity, stopbits=stopbits,
-            timeout=timeout, xonxoff=xonxoff, rtscts=rtscts, write_timeout=write_timeout,
-            dsrdtr=dsrdtr, inter_byte_timeout=inter_byte_timeout, exclusive=exclusive, **kwargs)
-        self.lock = threading.Lock()
-
-
 class Inverter(ABC):
     name: str
 
@@ -75,23 +46,23 @@ class KacoPowadorRs485(Inverter):
         if name is None:
             self.name = "Kaco Powador ({}:{})".format(serial.port, bus_address)
 
-    def read_values(self):
-        self.write_command(self.GET_ALL_CMD)
-        result = self.serialPort.read(self.RESPONSE_LENGTH)
-        if len(result) < 10:
-            time.sleep(1)
-            self.write_command(self.GET_ALL_CMD)
-            result = self.serialPort.read(self.RESPONSE_LENGTH)
-            if len(result) < 10:
-                return {"status": -1,
-                "generatorspannung": -1.0,
-                "generatorstrom": -1.0,
-                "generatorleistung": -1.0,
-                "netzspannung": -1.0,
-                "einspeisestrom": -1.0,
-                "einspeiseleistung": -1.0,
-                "temperatur": -1.0,
-                "tagesertrag": -1.0}
+    def read_values(self, lock: threading.Lock = None):
+        if lock is not None:
+            with lock:
+                result = self._do_read_values()
+        else:
+            result = self._do_read_values()
+
+        if result.empty():
+            return {"status": -1,
+                    "generatorspannung": -1.0,
+                    "generatorstrom": -1.0,
+                    "generatorleistung": -1.0,
+                    "netzspannung": -1.0,
+                    "einspeisestrom": -1.0,
+                    "einspeiseleistung": -1.0,
+                    "temperatur": -1.0,
+                    "tagesertrag": -1.0}
 
         line = result.split("\r\n")[0]
         values = line.split()[1:10]
@@ -105,14 +76,29 @@ class KacoPowadorRs485(Inverter):
                 "temperatur": values[7],
                 "tagesertrag": values[8]}
 
+    def _do_read_values(self):
+        self.write_command(self.GET_ALL_CMD)
+        result = self.serialPort.read(self.RESPONSE_LENGTH)
+        if len(result) < 10:
+            time.sleep(1)
+            self.write_command(self.GET_ALL_CMD)
+            result = self.serialPort.read(self.RESPONSE_LENGTH)
+            if len(result) < 10:
+                return ""
+        return result
+
     def write_command(self, command: int):
         return self.serialPort.write("#{:02d}{}\r".format(self.bus_address, command))
 
 
-def read_sdm_energy_values(device: sdm_modbus.SDM630):
+def read_sdm_energy_values(device: sdm_modbus.SDM630, lock: threading.Lock = None):
     """Read relevant energy values from SDM.
     """
-    results = device.read_all(sdm_modbus.registerType.INPUT)
+    if lock is not None:
+        with lock:
+            results = device.read_all(sdm_modbus.registerType.INPUT)
+    else:
+        results = device.read_all(sdm_modbus.registerType.INPUT)
     print(results)
     return results
 
@@ -125,15 +111,16 @@ def convert_measurements_to_influxdb_point(name: str, measurements: dict):
     return point
 
 
-def get_sdm_energy_values_observable(device: sdm_modbus.SDM630, interval: float):
+def get_sdm_energy_values_observable(
+        device: sdm_modbus.SDM630, interval: float, lock: threading.Lock = None):
     return rx.interval(period=datetime.timedelta(seconds=interval)) \
-        .pipe(ops.map(lambda _: read_sdm_energy_values(device)),
+        .pipe(ops.map(lambda _: read_sdm_energy_values(device, lock)),
               ops.map(lambda meas: convert_measurements_to_influxdb_point("sdm630", meas)))
 
 
-def get_inverter_values_observable(device: Inverter, interval: float):
+def get_inverter_values_observable(device: Inverter, interval: float, lock: threading.Lock = None):
     return rx.interval(period=datetime.timedelta(seconds=interval)) \
-        .pipe(ops.map(lambda _: device.read_values()),
+        .pipe(ops.map(lambda _: device.read_values(lock)),
               ops.map(lambda meas: convert_measurements_to_influxdb_point(device.name, meas)))
 
 
@@ -143,7 +130,7 @@ def get_combined_observable(observables: list):
 
 def log_observable_to_influx_db(data: Observable, params: InfluxDbParams):
     with InfluxDBClient(url=params.url, token=params.token,
-                        org=params.organisation, debug=True) as db_client:
+                        org=params.organisation) as db_client:
         with db_client.write_api(write_options=WriteOptions(batch_size=1)) as write_api:
             write_api.write(bucket=params.bucket, record=data)
             data.run()

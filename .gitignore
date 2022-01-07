@@ -1,4 +1,5 @@
 solarpi.env
+drive_credentials.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

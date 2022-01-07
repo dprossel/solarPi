@@ -1,0 +1,1 @@
+docker run --rm --volumes-from docker_influx_1 --mount type=bind,source="$(pwd)"/drive_credentials.json,target=/solarpi/drive_credentials.json -e RESTORE_DB=True --env DB_PATH=/var/lib/influxdb2 --env USER_EMAIL=muschti95@gmail.com musti95/backup-influx
