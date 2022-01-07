@@ -9,14 +9,15 @@ import threading
 
 
 def main():
-    env = get_environment_variables(["SERIAL_DEVICE", "SERIAL_BAUDRATE", "SDM_INTERVAL"])
+    env = get_environment_variables(["SERIAL_DEVICE", "SERIAL_BAUDRATE", "SDM_INTERVAL", "INV1_ADDR", "INV2_ADDR", "INV1_INTERVAL", "INV2_INTERVAL"])
     influx_params = get_influxdb_params_from_env()
 
     sdm = SDM630(device=env["SERIAL_DEVICE"], baud=int(env["SERIAL_BAUDRATE"]), parity="N", timeout=5)
-    serial_port = sdm.client.socket
+    serial_port = serial.Serial(env["SERIAL_DEVICE"], int(env["SERIAL_BAUDRATE"]), parity="N", timeout=5)
+    sdm.client.socket = serial_port
 
-    inverter1 = solarpi.KacoPowadorRs485(serial_port, env["INV1_ADDR"])
-    inverter2 = solarpi.KacoPowadorRs485(serial_port, env["INV2_ADDR"])
+    inverter1 = solarpi.KacoPowadorRs485(serial_port, env["INV1_ADDR"], name="WR Garage")
+    inverter2 = solarpi.KacoPowadorRs485(serial_port, env["INV2_ADDR"], name="WR Schipf")
 
     serial_port.open()
 
