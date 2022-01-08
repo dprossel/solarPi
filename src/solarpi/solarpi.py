@@ -46,11 +46,11 @@ class KacoPowadorRs485(Inverter):
     def read_values(self, lock: threading.Lock = None):
         if lock is not None:
             with lock:
-                result = self._do_read_values()
+                result = self._do_read_values(1)
         else:
-            result = self._do_read_values()
+            result = self._do_read_values(1)
 
-        if result.empty():
+        if result is None:
             return {"status": -1,
                     "generatorspannung": -1.0,
                     "generatorstrom": -1.0,
@@ -73,18 +73,13 @@ class KacoPowadorRs485(Inverter):
                 "temperatur": values[7],
                 "tagesertrag": values[8]}
 
-    def _do_read_values(self):
+    def _do_read_values(self, retries):
         self.write_command(self.GET_ALL_CMD)
-        time.sleep(0.5) # wait for result to be ready?
         result = self.serialPort.read(self.RESPONSE_LENGTH)
-        if len(result) == 0:
-            return ""
-        elif len(result) < 10:
-            time.sleep(1)
-            self.write_command(self.GET_ALL_CMD)
-            result = self.serialPort.read(self.RESPONSE_LENGTH)
-            if len(result) < 10:
-                return ""
+        if len(result) != self.RESPONSE_LENGTH:
+            if retries > 0:
+                return self._do_read_values(retries - 1)
+            return None
         return result
 
     def write_command(self, command: int):
