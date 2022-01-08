@@ -5,16 +5,19 @@ services:
                 image: influxdb:2.1
                 volumes:
                         - db-data:/var/lib/influxdb2
+                        - type: bind
+                          source: $PWD/docker/influxdb/config.yml
+                          target: /etc/influxdb2/config.yml
                 ports:
-                        - "8086:8086"
-                restart: unless-stopped
+                        - "80:80"
+                restart: always
         combined_read:
                 build: combined
                 depends_on:
                         - influx
                 devices:
                         - "/dev/ttyUSB0:/dev/ttyUSB0"
-                restart: unless-stopped
+                restart: always
                 env_file:
                         - solarpi.env
 volumes:

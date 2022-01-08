@@ -39,6 +39,8 @@ class KacoPowadorRs485(Inverter):
     def __init__(self, serial: serial.Serial, bus_address: int, name=None):
         self.bus_address = bus_address
         self.serialPort = serial
+
+        self.name=name
         if name is None:
             self.name = "Kaco Powador ({}:{})".format(serial.port, bus_address)
 
@@ -48,7 +50,6 @@ class KacoPowadorRs485(Inverter):
                 result = self._do_read_values(1)
         else:
             result = self._do_read_values(1)
-
         if result is None:
             return {"status": -1,
                     "generatorspannung": -1.0,
@@ -73,6 +74,8 @@ class KacoPowadorRs485(Inverter):
                 "tagesertrag": values[8]}
 
     def _do_read_values(self, retries):
+        if not self.serialPort.is_open:
+            self.serialPort.open()
         self.write_command(self.GET_ALL_CMD)
         result = self.serialPort.read(self.RESPONSE_LENGTH)
         if len(result) != self.RESPONSE_LENGTH:
@@ -82,7 +85,7 @@ class KacoPowadorRs485(Inverter):
         return result
 
     def write_command(self, command: int):
-        return self.serialPort.write("#{:02d}{}\r".format(self.bus_address, command))
+        return self.serialPort.write(str.encode("#{:02d}{}\r".format(self.bus_address, command)))
 
 
 def read_sdm_energy_values(device: sdm_modbus.SDM630, lock: threading.Lock = None):
@@ -93,27 +96,26 @@ def read_sdm_energy_values(device: sdm_modbus.SDM630, lock: threading.Lock = Non
             results = device.read_all(sdm_modbus.registerType.INPUT)
     else:
         results = device.read_all(sdm_modbus.registerType.INPUT)
-    print(results)
     return results
 
 
 def convert_measurements_to_influxdb_point(name: str, measurements: dict):
     point = Point(name)
     point.time(datetime.datetime.now(datetime.timezone.utc))
-    for key, val in measurements:
+    for key, val in measurements.items():
         point.field(key, val)
     return point
 
 
 def get_sdm_energy_values_observable(
-        device: sdm_modbus.SDM630, interval: float, lock: threading.Lock = None):
-    return rx.interval(period=datetime.timedelta(seconds=interval)) \
+        device: sdm_modbus.SDM630, interval: float, lock: threading.Lock = None, scheduler = None):
+    return rx.interval(period=datetime.timedelta(seconds=interval), scheduler=scheduler) \
         .pipe(ops.map(lambda _: read_sdm_energy_values(device, lock)),
               ops.map(lambda meas: convert_measurements_to_influxdb_point("sdm630", meas)))
 
 
-def get_inverter_values_observable(device: Inverter, interval: float, lock: threading.Lock = None):
-    return rx.interval(period=datetime.timedelta(seconds=interval)) \
+def get_inverter_values_observable(device: Inverter, interval: float, lock: threading.Lock = None, scheduler = None):
+    return rx.interval(period=datetime.timedelta(seconds=interval), scheduler=scheduler) \
         .pipe(ops.map(lambda _: device.read_values(lock)),
               ops.map(lambda meas: convert_measurements_to_influxdb_point(device.name, meas)))
 
