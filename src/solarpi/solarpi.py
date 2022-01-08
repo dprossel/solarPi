@@ -88,14 +88,16 @@ class KacoPowadorRs485(Inverter):
         return self.serialPort.write(str.encode("#{:02d}{}\r".format(self.bus_address, command)))
 
 
-def read_sdm_energy_values(device: sdm_modbus.SDM630, lock: threading.Lock = None):
+def read_sdm_energy_values(device: sdm_modbus.SDM630, values: list, lock: threading.Lock = None):
     """Read relevant energy values from SDM.
     """
     if lock is not None:
         with lock:
-            results = device.read_all(sdm_modbus.registerType.INPUT)
+            results = {register: device.read(register) for register in values}
+            #results = device.read_all(sdm_modbus.registerType.INPUT)
     else:
-        results = device.read_all(sdm_modbus.registerType.INPUT)
+        results = {register: device.read(register) for register in values}
+        #results = device.read_all(sdm_modbus.registerType.INPUT)
     return results
 
 
@@ -108,9 +110,9 @@ def convert_measurements_to_influxdb_point(name: str, measurements: dict):
 
 
 def get_sdm_energy_values_observable(
-        device: sdm_modbus.SDM630, interval: float, lock: threading.Lock = None, scheduler = None):
+        device: sdm_modbus.SDM630, interval: float, values: list, lock: threading.Lock = None, scheduler = None):
     return rx.interval(period=datetime.timedelta(seconds=interval), scheduler=scheduler) \
-        .pipe(ops.map(lambda _: read_sdm_energy_values(device, lock)),
+        .pipe(ops.map(lambda _: read_sdm_energy_values(device, values, lock)),
               ops.map(lambda meas: convert_measurements_to_influxdb_point("sdm630", meas)))
 
 
