@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from abc import ABC
 import serial
 import threading
-import time
 
 
 
