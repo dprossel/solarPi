@@ -35,21 +35,19 @@ def parse_inv_row(row: OrderedDict, name):
         .time(row[0], write_precision='s')
 
 
+names = [("sdm630", "sdm630"), ("WR1", "WR Garage"), ("WR2", "WR Schipf")]
+
 connection = sqlite3.connect(SQLITE_DB_PATH)
 cursor = connection.cursor()
-sdm_values = cursor.execute('SELECT * FROM sdm630').fetchall()
-inv1_values = cursor.execute('SELECT * FROM WR1').fetchall()
-inv2_values = cursor.execute('SELECT * FROM WR2').fetchall()
-
-sdm_obs = rx.from_iterable(sdm_values).pipe(ops.map(lambda row: parse_sdm_row(row)))
-inv1_obs = rx.from_iterable(inv1_values).pipe(ops.map(lambda row: parse_inv_row(row, "WR Garage")))
-inv2_obs = rx.from_iterable(inv2_values).pipe(ops.map(lambda row: parse_inv_row(row, "WR Schipf")))
-
 
 with InfluxDBClient(url=INFLUX.url, token=INFLUX.token, org=INFLUX.organisation) as client:
     print("Connected to InfluxDB!")
     write_options = WriteOptions(batch_size=BATCH_SIZE, flush_interval=FLUSH_INTERVAL)
     with client.write_api(write_options=write_options) as write_api:
         print("Migrating...")
-        write_api.write(bucket=INFLUX.bucket, record=rx.merge(sdm_obs, inv1_obs, inv2_obs))
+        for old_name, new_name in names:
+            print(old_name+"...")
+            values = cursor.execute('SELECT * FROM {}}'.format(old_name)).fetchall()
+            obs = rx.from_iterable(values).pipe(ops.map(lambda row: parse_sdm_row(row) if old_name == "sdm630" else parse_inv_row(row, new_name)))
+            write_api.write(bucket=INFLUX.bucket, record=obs)
 print("Finished migration!")
