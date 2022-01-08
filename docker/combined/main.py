@@ -19,8 +19,6 @@ def main():
     inverter1 = solarpi.KacoPowadorRs485(serial_port, env["INV1_ADDR"], name="WR Garage")
     inverter2 = solarpi.KacoPowadorRs485(serial_port, env["INV2_ADDR"], name="WR Schipf")
 
-    serial_port.open()
-
     serial_lock = threading.Lock()
     sdm_obs = get_sdm_energy_values_observable(sdm, float(env["SDM_INTERVAL"]), serial_lock)
     inv1_obs = get_inverter_values_observable(inverter1, float(env["INV1_INTERVAL"]), serial_lock)

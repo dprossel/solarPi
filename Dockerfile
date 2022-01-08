@@ -3,6 +3,7 @@ FROM python:3
 
 RUN groupadd -g 999 solarpi &&\
     useradd -r -u 999 -g solarpi solarpi &&\
+    usermod -a -G dialout solarpi &&\
     mkdir -p /home/solarpi &&\
     chown -R solarpi:solarpi /home/solarpi
 USER solarpi
