@@ -40,7 +40,7 @@ names = [("sdm630", "sdm630"), ("WR1", "WR Garage"), ("WR2", "WR Schipf")]
 connection = sqlite3.connect(SQLITE_DB_PATH)
 cursor = connection.cursor()
 
-with InfluxDBClient(url=INFLUX.url, token=INFLUX.token, org=INFLUX.organisation) as client:
+with InfluxDBClient(url=INFLUX.url, token=INFLUX.token, org=INFLUX.organisation, timeout=100000) as client:
     print("Connected to InfluxDB!")
     write_options = WriteOptions(batch_size=BATCH_SIZE, flush_interval=FLUSH_INTERVAL)
     with client.write_api(write_options=write_options) as write_api:
