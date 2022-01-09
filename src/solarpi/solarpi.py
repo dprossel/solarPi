@@ -32,7 +32,7 @@ class Inverter(ABC):
 
 class KacoPowadorRs485(Inverter):
     RESPONSE_LENGTH = 17
-    GET_ALL_CMD = 9
+    GET_ALL_CMD = 0
     bus_address: int
     serialPort: serial.Serial
 
@@ -79,6 +79,7 @@ class KacoPowadorRs485(Inverter):
         self.write_command(self.GET_ALL_CMD)
         result = self.serialPort.read(self.RESPONSE_LENGTH)
         if len(result) != self.RESPONSE_LENGTH:
+            print("Wrong response length", len(result))
             if retries > 0:
                 return self._do_read_values(retries - 1)
             return None

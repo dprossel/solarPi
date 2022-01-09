@@ -9,8 +9,8 @@ import rx
 import rx.operators as ops
 
 SQLITE_DB_PATH = "SolarPi.db"
-BATCH_SIZE = 50000
-FLUSH_INTERVAL = 10000
+BATCH_SIZE = 500
+FLUSH_INTERVAL = 100
 
 INFLUX = get_influxdb_params_from_env()
 
@@ -24,14 +24,14 @@ def parse_sdm_row(row: OrderedDict):
 def parse_inv_row(row: OrderedDict, name):
     return Point(name) \
         .field("status", row[1]) \
-        .field("generatorspannung", row[2]) \
-        .field("generatorstrom", row[3]) \
-        .field("generatorleistung", row[4]) \
-        .field("netzspannung", row[5]) \
-        .field("einspeisestrom", row[6]) \
-        .field("einspeiseleistung", row[7]) \
-        .field("temperatur", row[8]) \
-        .field("tagesertrag", row[9]) \
+        .field("generatorspannung", float(row[2])) \
+        .field("generatorstrom", float(row[3])) \
+        .field("generatorleistung", float(row[4])) \
+        .field("netzspannung", float(row[5])) \
+        .field("einspeisestrom", float(row[6])) \
+        .field("einspeiseleistung", float(row[7])) \
+        .field("temperatur", float(row[8])) \
+        .field("tagesertrag", float(row[9])) \
         .time(row[0], write_precision='s')
 
 
@@ -47,7 +47,8 @@ with InfluxDBClient(url=INFLUX.url, token=INFLUX.token, org=INFLUX.organisation)
         print("Migrating...")
         for old_name, new_name in names:
             print(old_name+"...")
-            values = cursor.execute('SELECT * FROM {}}'.format(old_name)).fetchall()
+            values = cursor.execute('SELECT * FROM {}'.format(old_name)).fetchall()
             obs = rx.from_iterable(values).pipe(ops.map(lambda row: parse_sdm_row(row) if old_name == "sdm630" else parse_inv_row(row, new_name)))
             write_api.write(bucket=INFLUX.bucket, record=obs)
+            obs.run()
 print("Finished migration!")
