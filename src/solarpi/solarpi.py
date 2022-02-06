@@ -61,8 +61,7 @@ class KacoPowadorRs485(Inverter):
                     "temperatur": -1.0,
                     "tagesertrag": -1.0}
 
-        line = result.decode().split("\r\n")[0]
-        values = line.split()[1:10]
+        values = result.split()[1:10]
         return {"status": int(values[0]),
                 "generatorspannung": float(values[1]),
                 "generatorstrom": float(values[2])*1000,
