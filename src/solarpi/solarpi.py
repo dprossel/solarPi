@@ -31,7 +31,7 @@ class Inverter(ABC):
 
 
 class KacoPowadorRs485(Inverter):
-    RESPONSE_LENGTH = 17
+    RESPONSE_LENGTH = 66
     GET_ALL_CMD = 0
     bus_address: int
     serialPort: serial.Serial
@@ -61,17 +61,17 @@ class KacoPowadorRs485(Inverter):
                     "temperatur": -1.0,
                     "tagesertrag": -1.0}
 
-        line = result.split("\r\n")[0]
+        line = result.decode().split("\r\n")[0]
         values = line.split()[1:10]
-        return {"status": values[0],
-                "generatorspannung": values[1],
-                "generatorstrom": values[2]*1000,
-                "generatorleistung": values[3],
-                "netzspannung": values[4],
-                "einspeisestrom": values[5]*1000,
-                "einspeiseleistung": values[6],
-                "temperatur": values[7],
-                "tagesertrag": values[8]}
+        return {"status": int(values[0]),
+                "generatorspannung": float(values[1]),
+                "generatorstrom": float(values[2])*1000,
+                "generatorleistung": float(values[3]),
+                "netzspannung": float(values[4]),
+                "einspeisestrom": float(values[5])*1000,
+                "einspeiseleistung": float(values[6]),
+                "temperatur": float(values[7]),
+                "tagesertrag": float(values[8])}
 
     def _do_read_values(self, retries):
         if not self.serialPort.is_open:

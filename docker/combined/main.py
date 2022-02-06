@@ -16,8 +16,8 @@ def main():
     env = get_environment_variables(["SERIAL_DEVICE", "SERIAL_BAUDRATE", "SDM_INTERVAL", "SDM_ADDR", "INV1_ADDR", "INV2_ADDR", "INV1_INTERVAL", "INV2_INTERVAL"])
     influx_params = get_influxdb_params_from_env()
 
-    sdm = SDM630(device=env["SERIAL_DEVICE"], baud=int(env["SERIAL_BAUDRATE"]), parity="N", timeout=1, unit=int(env["SDM_ADDR"]))
-    serial_port = serial.Serial(env["SERIAL_DEVICE"], int(env["SERIAL_BAUDRATE"]), parity="N", timeout=1)
+    sdm = SDM630(device=env["SERIAL_DEVICE"], baud=int(env["SERIAL_BAUDRATE"]), parity="N", timeout=2, unit=int(env["SDM_ADDR"]))
+    serial_port = serial.Serial(env["SERIAL_DEVICE"], int(env["SERIAL_BAUDRATE"]), parity="N", timeout=2)
     sdm.client.socket = serial_port
     values = [key for key in sdm.read_all(sdm_modbus.registerType.INPUT).keys()]
 
