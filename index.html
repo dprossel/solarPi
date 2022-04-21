@@ -1,10 +1,81 @@
 <!DOCTYPE HTML>
 <html>
-	<head>
-		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-		<title> Solar Pi </title>
-	</head>
-	<body>
-		<div id="iframe-container"></div>
-	</body>
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<title>SolarPi</title>
+	<style>
+		#iframe-container {
+			position: relative;
+			overflow: hidden;
+			padding-top: 56.25%;
+		}
+
+		#influx-iframe {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			border: 0;
+		}
+	</style>
+	<script type="text/javascript">
+		/*
+		// Prevent variables from being global
+		(function () {
+
+			/*
+			1. Inject CSS which makes iframe invisible
+			*/
+		/*
+					var div = document.createElement('div'),
+						ref = document.getElementsByTagName('base')[0] ||
+							document.getElementsByTagName('script')[0];
+		
+					div.innerHTML = '&shy;<style>
+				iframe {
+						visibility: hidden;
+					}
+			</style > ';
+		
+					ref.parentNode.insertBefore(div, ref);
+		
+		
+					/*
+					2. When window loads, remove that CSS,
+					making iframe visible again
+					*/
+		/*
+					window.onload = function () {
+						div.parentNode.removeChild(div);
+					}
+		
+				})();*/
+		function loginUser(username, password) {
+			fetch("http://localhost:8086/api/v2/signin", {
+				method: 'post',
+				headers: {
+					"authorization": 'Basic ' + btoa(username + ":" + password)
+				},
+			}).then(function (response) {
+				console.log('Set-Cookie', response.headers.get("Set-Cookie"))
+			}).catch(function (error) {
+				console.log('Request failed', error);
+			});
+		}
+
+		function loadInflux() {
+			container = document.getElementById("iframe-container");
+			container.innerHTML = "<iframe src='192.168.0.44:8086' />";
+		}
+
+
+	</script>
+</head>
+
+<body onload="loadInflux()">
+	<div id="iframe-container"></div>
+</body>
+
 </html>
