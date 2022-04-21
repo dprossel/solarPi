@@ -53,11 +53,12 @@
 		
 				})();*/
 		function loginUser(username, password) {
-			fetch("http://localhost:8086/api/v2/signin", {
+			fetch(window.location.origin + ":8080/api/v2/signin", {
 				method: 'post',
 				headers: {
 					"authorization": 'Basic ' + btoa(username + ":" + password)
 				},
+				credentials: "include"
 			}).then(function (response) {
 				console.log('Set-Cookie', response.headers.get("Set-Cookie"))
 			}).catch(function (error) {
@@ -67,7 +68,7 @@
 
 		function loadInflux() {
 			container = document.getElementById("iframe-container");
-			container.innerHTML = "<iframe src='192.168.0.44:8086' />";
+			container.innerHTML = "<iframe src='" + window.location.origin + ":8080' id='influx-iframe' />";
 		}
 
 
