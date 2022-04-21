@@ -9,7 +9,7 @@ services:
                           source: $PWD/docker/influxdb/config.yml
                           target: /etc/influxdb2/config.yml
                 ports:
-                        - "80:80"
+                        - "8086:8086"
                 restart: always
         combined_read:
                 build: combined

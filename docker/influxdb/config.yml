@@ -3,7 +3,7 @@ bolt-path: /var/lib/influxdb2/influxd.bolt
 e2e-testing: false
 engine-path: /var/lib/influxdb2/engine
 feature-flags: {}
-http-bind-address: :80
+http-bind-address: :8086
 http-idle-timeout: 3m0s
 http-read-header-timeout: 10s
 http-read-timeout: 0s
