@@ -16,4 +16,4 @@ def get_influxdb_params_from_env():
     return InfluxDbParams(*(get_environment_variables(["INFLUXDB_URL", "INFLUXDB_TOKEN", "INFLUXDB_ORG", "INFLUXDB_BUCKET"]).values()))
 
 def get_mqtt_params_from_env():
-    return MqttParams(*(get_environment_variables(["MQTT_BROKER", "MQTT_CLIENTID", "MQTT_PORT"]).values()))
+    return MqttParams(*(get_environment_variables(["MQTT_BROKER", "MQTT_PORT", "MQTT_CLIENTID"]).values()))
