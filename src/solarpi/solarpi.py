@@ -28,8 +28,11 @@ class MqttParams:
     """Contains the necessary parameters to publish data via MQTT.
     """
     broker: str
-    port: str
+    port: int
     client_id: str
+
+    def __post_init__(self):
+        self.port = int(self.port)
 
 
 class Inverter(ABC):
