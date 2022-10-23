@@ -4,6 +4,7 @@ import rx
 from rx.core.typing import Observable
 import rx.operators as ops
 from influxdb_client import Point, InfluxDBClient, WriteOptions
+from paho.mqtt import client as mqtt_client
 import sdm_modbus
 from dataclasses import dataclass
 from abc import ABC
@@ -20,6 +21,15 @@ class InfluxDbParams:
     token: str
     organisation: str
     bucket: str
+
+
+@dataclass
+class MqttParams:
+    """Contains the necessary parameters to publish data via MQTT.
+    """
+    broker: str
+    port: str
+    client_id: str
 
 
 class Inverter(ABC):
@@ -126,9 +136,27 @@ def get_combined_observable(observables: list):
     return rx.merge(*observables)
 
 
-def log_observable_to_influx_db(data: Observable, params: InfluxDbParams):
-    with InfluxDBClient(url=params.url, token=params.token,
-                        org=params.organisation) as db_client:
-        with db_client.write_api(write_options=WriteOptions(batch_size=1)) as write_api:
-            write_api.write(bucket=params.bucket, record=data)
-            data.run()
+def subscribe_influx_db_to_observable(data: Observable, params: InfluxDbParams):
+    client = InfluxDBClient(url=params.url, token=params.token, org=params.organisation)
+    write_api = client.write_api(write_options=WriteOptions(batch_size=1))
+    write_api.write(bucket=params.bucket, record=data)
+    return write_api
+
+
+def influxdb_point_to_mqtt(point):
+    topics = [point._name + "/" + k for k in point._fields.keys()]
+    return [topics, point._fields.values()]
+
+
+def subscribe_mqtt_to_observable(data: Observable, params: MqttParams):
+    def on_connect(client, userdata, flags, rc):
+        if rc != 0:
+            print("Failed to connect, return code %d\n", rc)
+
+    client = mqtt_client.Client(params.client_id)
+    client.on_connect = on_connect
+    client.connect(params.broker, params.port)
+    data.subscribe(on_next = lambda point: map(client.publish, *influxdb_point_to_mqtt(point)),
+                   on_error = lambda e: print("Error : {0}".format(e)))
+    return client
+
