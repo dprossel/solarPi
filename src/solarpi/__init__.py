@@ -1,4 +1,5 @@
 from .solarpi import InfluxDbParams
+from .solarpi import MqttParams
 from .solarpi import Inverter
 from .solarpi import KacoPowadorRs485
 from .solarpi import get_sdm_energy_values_observable
