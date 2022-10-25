@@ -159,7 +159,7 @@ def subscribe_mqtt_to_observable(data: Observable, params: MqttParams):
     client = mqtt_client.Client(params.client_id)
     client.on_connect = on_connect
     client.connect(params.broker, params.port)
-    data.subscribe(on_next = lambda point: map(client.publish, *influxdb_point_to_mqtt(point)),
+    data.subscribe(on_next = lambda point: list(map(client.publish, *influxdb_point_to_mqtt(point))),
                    on_error = lambda e: print("Error : {0}".format(e)))
     return client
 

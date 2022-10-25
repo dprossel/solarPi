@@ -35,23 +35,23 @@ def main():
     combined_data = get_combined_observable([sdm_obs, inv1_obs, inv2_obs])
 
 
-    subscriptions = []
+    influx_api = None
     try:
-        subscriptions.append(subscribe_influx_db_to_observable(combined_data, influx_params))
+        influx_api = subscribe_influx_db_to_observable(combined_data, influx_params)
     except:
         print("Could not connect to InfluxDb!")
     
+    mqtt_client = None
     try:
-        subscriptions.append(subscribe_mqtt_to_observable(combined_data, mqtt_params))
+        mqtt_client = subscribe_mqtt_to_observable(combined_data, mqtt_params)
     except:
         print("Could not connect to MQTT!")
     
-    if len(subscriptions) == 2:
-        with subscriptions[0], subscriptions[1]:
+    if influx_api is not None:
+        with influx_api:
             combined_data.run()
-    elif len(subscriptions) == 1:
-        with subscriptions[0]:
-            combined_data.run()
+    elif mqtt_client is not None:
+        combined_data.run()
     else:
         print("Could not subscribe any clients! Exiting")
 
