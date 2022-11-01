@@ -71,7 +71,7 @@ class KacoPowadorRs485(SerialReader):
     GET_ALL_CMD = 0
 
     def __init__(self, serial: serial.Serial, bus_address: int, name: str = None):
-        super.__init__(name)
+        super().__init__(name)
         self._bus_address = bus_address
         self._serialPort = serial
 
@@ -107,8 +107,8 @@ class EnergyReader(SerialReader):
     """Read relevant energy values from SDM.
     """
 
-    def __init__(self, device: sdm_modbus.SDM630, values: list | sdm_modbus.registerType, name: str = None):
-        super.__init__(name)
+    def __init__(self, device: sdm_modbus.SDM630, values: list, name: str = None):
+        super().__init__(name)
         self._device = device
 
         if isinstance(values, sdm_modbus.registerType):

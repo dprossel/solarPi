@@ -50,6 +50,7 @@ def main():
     for client in clients:
         client.subscribe(combined_data)
     combined_data.connect()
+    combined_data.run()
 
 
 if __name__ == "__main__":
