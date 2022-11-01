@@ -1,8 +1,8 @@
 import abc
 import datetime
-import rx
-from rx.core.typing import Observable
-import rx.operators as ops
+import reactivex as rx
+import reactivex.operators as ops
+from reactivex.abc.scheduler import SchedulerBase
 from influxdb_client import Point, InfluxDBClient, WriteOptions
 from paho.mqtt import client as mqtt_client
 import sdm_modbus
@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from abc import ABC
 import serial
 import threading
-
 
 
 @dataclass
@@ -35,44 +34,58 @@ class MqttParams:
         self.port = int(self.port)
 
 
-class Inverter(ABC):
-    name: str
+@dataclass
+class Measurement:
+    """The item type in the observable measurement stream obtained from an inverter or energy meter.
+    """
+    device_name: str
+    values: dict
+
+
+class SerialReader(ABC):
+    def __init__(self, name):
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def read_values(self, retries: int = 1, lock: threading.Lock = None) -> dict:
+        if lock is None:
+            result = self._do_read_values()
+        else:
+            with lock:
+                result = self._do_read_values()
+        if result is None and retries > 0:
+            return self.read_values(retries - 1, lock)
+        return result
 
     @abc.abstractmethod
-    def read_values(self):
+    def _do_read_values(self) -> dict:
         pass
 
 
-class KacoPowadorRs485(Inverter):
+class KacoPowadorRs485(SerialReader):
     RESPONSE_LENGTH = 66
     GET_ALL_CMD = 0
-    bus_address: int
-    serialPort: serial.Serial
 
-    def __init__(self, serial: serial.Serial, bus_address: int, name=None):
-        self.bus_address = bus_address
-        self.serialPort = serial
+    def __init__(self, serial: serial.Serial, bus_address: int, name: str = None):
+        super().__init__(name)
+        self._bus_address = bus_address
+        self._serialPort = serial
 
-        self.name=name
-        if name is None:
-            self.name = "Kaco Powador ({}:{})".format(serial.port, bus_address)
+        if self._name is None:
+            self._name = "Kaco Powador ({}:{})".format(
+                serial.port, bus_address)
 
-    def read_values(self, lock: threading.Lock = None):
-        if lock is not None:
-            with lock:
-                result = self._do_read_values(1)
-        else:
-            result = self._do_read_values(1)
-        if result is None:
-            return {"status": -1,
-                    "generatorspannung": -1.0,
-                    "generatorstrom": -1.0,
-                    "generatorleistung": -1.0,
-                    "netzspannung": -1.0,
-                    "einspeisestrom": -1.0,
-                    "einspeiseleistung": -1.0,
-                    "temperatur": -1.0,
-                    "tagesertrag": -1.0}
+    def _do_read_values(self) -> dict:
+        if not self._serialPort.is_open:
+            self._serialPort.open()
+        self.write_command(self.GET_ALL_CMD)
+        result = self._serialPort.read(self.RESPONSE_LENGTH)
+        if len(result) != self.RESPONSE_LENGTH:
+            #print("Wrong response length", len(result))
+            return None
 
         values = result.split()[1:10]
         return {"status": int(values[0]),
@@ -85,81 +98,87 @@ class KacoPowadorRs485(Inverter):
                 "temperatur": float(values[7]),
                 "tagesertrag": float(values[8])}
 
-    def _do_read_values(self, retries):
-        if not self.serialPort.is_open:
-            self.serialPort.open()
-        self.write_command(self.GET_ALL_CMD)
-        result = self.serialPort.read(self.RESPONSE_LENGTH)
-        if len(result) != self.RESPONSE_LENGTH:
-            print("Wrong response length", len(result))
-            if retries > 0:
-                return self._do_read_values(retries - 1)
-            return None
-        return result
-
-    def write_command(self, command: int):
-        return self.serialPort.write(str.encode("#{:02d}{}\r".format(self.bus_address, command)))
+    def write_command(self, command: int) -> int:
+        return self._serialPort.write(str.encode("#{:02d}{}\r".format(self._bus_address, command)))
 
 
-def read_sdm_energy_values(device: sdm_modbus.SDM630, values: list, lock: threading.Lock = None):
+class EnergyReader(SerialReader):
     """Read relevant energy values from SDM.
     """
-    if lock is not None:
-        with lock:
-            results = {register: device.read(register) for register in values}
-            #results = device.read_all(sdm_modbus.registerType.INPUT)
-    else:
-        results = {register: device.read(register) for register in values}
-        #results = device.read_all(sdm_modbus.registerType.INPUT)
-    return results
+
+    def __init__(self, device: sdm_modbus.SDM630, values: list, name: str = None):
+        super().__init__(name)
+        self._device = device
+
+        if isinstance(values, sdm_modbus.registerType):
+            values = [key for key in device.read_all(values).keys()]
+        self._values = values
+
+        if self._name is None:
+            self._name = "{} ({}:{})".format(
+                self._device.model, self._device.host, self._device.port)
+
+    def _do_read_values(self) -> dict:
+        return {register: self._device.read(register) for register in self._values}
 
 
-def convert_measurements_to_influxdb_point(name: str, measurements: dict):
-    point = Point(name)
-    point.time(datetime.datetime.now(datetime.timezone.utc))
-    for key, val in measurements.items():
-        point.field(key, val)
-    return point
+class Wrapper(ABC):
+    @abc.abstractmethod
+    def subscribe(self, data: rx.Observable):
+        pass
 
 
-def get_sdm_energy_values_observable(
-        device: sdm_modbus.SDM630, interval: float, values: list, lock: threading.Lock = None, scheduler = None):
-    return rx.interval(period=datetime.timedelta(seconds=interval), scheduler=scheduler) \
-        .pipe(ops.map(lambda _: read_sdm_energy_values(device, values, lock)),
-              ops.map(lambda meas: convert_measurements_to_influxdb_point("sdm630", meas)))
+class MqttWrapper(Wrapper):
+    """Wraps the mqtt client.
+    """
 
+    def __init__(self, params: MqttParams):
+        self._data_handle = None
+        self._client = mqtt_client.Client(params.client_id)
+        self._client.on_connect = self._on_connect
+        self._client.connect(params.broker, params.port)
 
-def get_inverter_values_observable(device: Inverter, interval: float, lock: threading.Lock = None, scheduler = None):
-    return rx.interval(period=datetime.timedelta(seconds=interval), scheduler=scheduler) \
-        .pipe(ops.map(lambda _: device.read_values(lock)),
-              ops.map(lambda meas: convert_measurements_to_influxdb_point(device.name, meas)))
+    def subscribe(self, data: rx.Observable):
+        self.data_handle = data.subscribe(
+            on_next=self.handle_measurement, on_error=lambda e: print("Error : {0}".format(e)))
+    def handle_measurement(self, measurement: Measurement):
+        for key, value in measurement.values.items():
+            topic = "{}/{}".format(measurement.device_name, key)
+            self._client.publish(topic, value)
 
-
-def get_combined_observable(observables: list):
-    return rx.merge(*observables)
-
-
-def subscribe_influx_db_to_observable(data: Observable, params: InfluxDbParams):
-    client = InfluxDBClient(url=params.url, token=params.token, org=params.organisation)
-    write_api = client.write_api(write_options=WriteOptions(batch_size=1))
-    write_api.write(bucket=params.bucket, record=data)
-    return write_api
-
-
-def influxdb_point_to_mqtt(point):
-    topics = [point._name + "/" + k for k in point._fields.keys()]
-    return [topics, point._fields.values()]
-
-
-def subscribe_mqtt_to_observable(data: Observable, params: MqttParams):
-    def on_connect(client, userdata, flags, rc):
+    def _on_connect(self, client, userdata, flags, rc):
         if rc != 0:
             print("Failed to connect, return code %d\n", rc)
 
-    client = mqtt_client.Client(params.client_id)
-    client.on_connect = on_connect
-    client.connect(params.broker, params.port)
-    data.subscribe(on_next = lambda point: list(map(client.publish, *influxdb_point_to_mqtt(point))),
-                   on_error = lambda e: print("Error : {0}".format(e)))
-    return client
 
+class InfluxDbWrapper(Wrapper):
+    """Wraps the InfluxDb client.
+    """
+
+    def __init__(self, params: InfluxDbParams):
+        client = InfluxDBClient(
+            url=params.url, token=params.token, org=params.organisation)
+        self._write_api = client.write_api(
+            write_options=WriteOptions(batch_size=1))
+        self._bucket = params.bucket
+
+    def subscribe(self, data: rx.Observable):
+        point_data = data.pipe(ops.map(self.handle_measurement))
+        self._write_api.write(bucket=self._bucket, record=point_data)
+
+    def handle_measurement(self, measurement: Measurement):
+        point = Point(measurement.device_name)
+        point.time(datetime.datetime.now(datetime.timezone.utc))
+        for key, val in measurement.values.items():
+            point.field(key, val)
+        return point
+
+
+def get_measurement_observable(
+        reader: SerialReader, interval: float, retries: int = 1, lock: threading.Lock = None, scheduler: SchedulerBase = None) -> rx.Observable:
+    return rx.interval(period=datetime.timedelta(seconds=interval), scheduler=scheduler) \
+        .pipe(ops.map(lambda _: reader.read_values(retries, lock)), ops.filter(lambda v: v is not None), ops.map(lambda v: Measurement(reader.name, v)))
+
+
+def get_combined_observable(observables: list) -> rx.Observable:
+    return rx.merge(*observables).pipe(ops.publish())

@@ -5,8 +5,8 @@ import sqlite3
 
 from solarpi.utils import get_influxdb_params_from_env
 from influxdb_client import Point, InfluxDBClient, WriteOptions
-import rx
-import rx.operators as ops
+import reactivex as rx
+import reactivex.operators as ops
 
 SQLITE_DB_PATH = "SolarPi.db"
 BATCH_SIZE = 500
