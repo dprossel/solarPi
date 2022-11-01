@@ -56,9 +56,8 @@ class SerialReader(ABC):
         else:
             with lock:
                 result = self._do_read_values()
-
         if result is None and retries > 0:
-            return self.read_values(retries - 1)
+            return self.read_values(retries - 1, lock)
         return result
 
     @abc.abstractmethod
@@ -100,7 +99,7 @@ class KacoPowadorRs485(SerialReader):
                 "tagesertrag": float(values[8])}
 
     def write_command(self, command: int) -> int:
-        return self.serialPort.write(str.encode("#{:02d}{}\r".format(self._bus_address, command)))
+        return self._serialPort.write(str.encode("#{:02d}{}\r".format(self._bus_address, command)))
 
 
 class EnergyReader(SerialReader):
@@ -142,9 +141,8 @@ class MqttWrapper(Wrapper):
     def subscribe(self, data: rx.Observable):
         self.data_handle = data.subscribe(
             on_next=self.handle_measurement, on_error=lambda e: print("Error : {0}".format(e)))
-
     def handle_measurement(self, measurement: Measurement):
-        for key, value in measurement.values:
+        for key, value in measurement.values.items():
             topic = "{}/{}".format(measurement.device_name, key)
             self._client.publish(topic, value)
 
@@ -179,7 +177,7 @@ class InfluxDbWrapper(Wrapper):
 def get_measurement_observable(
         reader: SerialReader, interval: float, retries: int = 1, lock: threading.Lock = None, scheduler: SchedulerBase = None) -> rx.Observable:
     return rx.interval(period=datetime.timedelta(seconds=interval), scheduler=scheduler) \
-        .pipe(ops.map(lambda _: reader.read_values(retries, lock)), ops.filter(lambda v: v is not None), ops.map(lambda v: Measurement(reader.name(), v)))
+        .pipe(ops.map(lambda _: reader.read_values(retries, lock)), ops.filter(lambda v: v is not None), ops.map(lambda v: Measurement(reader.name, v)))
 
 
 def get_combined_observable(observables: list) -> rx.Observable:
