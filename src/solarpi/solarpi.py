@@ -84,7 +84,7 @@ class KacoPowadorRs485(SerialReader):
         self.write_command(self.GET_ALL_CMD)
         result = self._serialPort.read(self.RESPONSE_LENGTH)
         if len(result) != self.RESPONSE_LENGTH:
-            print("Wrong response length", len(result))
+            #print("Wrong response length", len(result))
             return None
 
         values = result.split()[1:10]
