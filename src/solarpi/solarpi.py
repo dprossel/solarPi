@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from abc import ABC
 import serial
 import threading
+import time
 
 
 @dataclass
@@ -137,10 +138,24 @@ class MqttWrapper(Wrapper):
         self._client = mqtt_client.Client(params.client_id)
         self._client.on_connect = self._on_connect
         self._client.connect(params.broker, params.port)
+    
+    def _on_error(self, data, e):
+        print("Error : {0}".format(e))
+        i = 1
+        while True:
+            time.sleep(5**i)
+            try:
+                self._client.reconnect()
+                #self.subscribe(data)
+            except:
+                if i < 5:
+                    i += 1
+                print("Retry to connect to MQTT unsuccessful! Waiting " + 5**i + " seconds for next try.")
+
 
     def subscribe(self, data: rx.Observable):
         self.data_handle = data.subscribe(
-            on_next=self.handle_measurement, on_error=lambda e: print("Error : {0}".format(e)))
+            on_next=self.handle_measurement, on_error=lambda e: self._on_error(data, e))
     def handle_measurement(self, measurement: Measurement):
         for key, value in measurement.values.items():
             topic = "{}/{}".format(measurement.device_name, key)
