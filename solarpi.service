@@ -5,7 +5,7 @@ Description = SolarPi service for read values.
 EnvironmentFile=-/home/pi/solarPi/docker/solarpi.env
 Environment=PYTHONUNBUFFERED=1
 ExecStart = /usr/bin/python3 /home/pi/solarPi/docker/combined/main.py
-Restart=on-failure
+Restart=always
 User=pi
 
 [Install]
