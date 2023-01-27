@@ -1,8 +1,5 @@
 import abc
 import datetime
-import reactivex as rx
-import reactivex.operators as ops
-from reactivex.abc.scheduler import SchedulerBase
 from influxdb_client import Point, InfluxDBClient, WriteOptions
 from paho.mqtt import client as mqtt_client
 import sdm_modbus
@@ -10,7 +7,6 @@ from dataclasses import dataclass
 from abc import ABC
 import serial
 import threading
-import time
 
 
 @dataclass
@@ -139,23 +135,6 @@ class MqttWrapper(Wrapper):
         self._client.on_connect = self._on_connect
         self._client.connect(params.broker, params.port)
     
-    def _on_error(self, data, e):
-        print("Error : {0}".format(e))
-        i = 1
-        while True:
-            time.sleep(5**i)
-            try:
-                self._client.reconnect()
-                #self.subscribe(data)
-            except:
-                if i < 5:
-                    i += 1
-                print("Retry to connect to MQTT unsuccessful! Waiting " + 5**i + " seconds for next try.")
-
-
-    def subscribe(self, data: rx.Observable):
-        self.data_handle = data.subscribe(
-            on_next=self.handle_measurement, on_error=lambda e: self._on_error(data, e))
     def handle_measurement(self, measurement: Measurement):
         for key, value in measurement.values.items():
             topic = "{}/{}".format(measurement.device_name, key)
@@ -177,23 +156,10 @@ class InfluxDbWrapper(Wrapper):
             write_options=WriteOptions(batch_size=1))
         self._bucket = params.bucket
 
-    def subscribe(self, data: rx.Observable):
-        point_data = data.pipe(ops.map(self.handle_measurement))
-        self._write_api.write(bucket=self._bucket, record=point_data)
-
     def handle_measurement(self, measurement: Measurement):
         point = Point(measurement.device_name)
         point.time(datetime.datetime.now(datetime.timezone.utc))
         for key, val in measurement.values.items():
             point.field(key, val)
-        return point
+        self._write_api.write(self._bucket, record=point)
 
-
-def get_measurement_observable(
-        reader: SerialReader, interval: float, retries: int = 1, lock: threading.Lock = None, scheduler: SchedulerBase = None) -> rx.Observable:
-    return rx.interval(period=datetime.timedelta(seconds=interval), scheduler=scheduler) \
-        .pipe(ops.map(lambda _: reader.read_values(retries, lock)), ops.filter(lambda v: v is not None), ops.map(lambda v: Measurement(reader.name, v)))
-
-
-def get_combined_observable(observables: list) -> rx.Observable:
-    return rx.merge(*observables).pipe(ops.publish())
