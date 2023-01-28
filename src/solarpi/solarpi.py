@@ -120,8 +120,41 @@ class EnergyReader(SerialReader):
 
 
 class Wrapper(ABC):
-    @abc.abstractmethod
+    def __init__(self):
+        self._do_init = True
+        self._MAX_RETRIES = 4
+        self._num_retries = self._MAX_RETRIES
+
     def handle_measurement(self, measurement: Measurement):
+        if self._do_init:
+            try:
+                self.init()
+            except Exception as e:
+                self._num_retries -= 1
+                if self._num_retries > 0:
+                    self._do_init = True
+                    print("Initialization failed. Remaining retries:", self._num_retries)
+                else:
+                    print("Giving up on trying to reconnect.")
+                    self._do_init = False
+            else:
+                self._num_retries = self._MAX_RETRIES
+                self._do_init = False
+        
+        if not self._do_init and self._num_retries > 0:
+            try:
+                self._do_handle_measurement(measurement)
+            except Exception as e:
+                self._do_init = True
+                print("Client failed to publish:")
+                print(e)
+
+    @abc.abstractmethod
+    def _do_handle_measurement(self, measurement: Measurement):
+        pass
+
+    @abc.abstractmethod
+    def init(self):
         pass
 
 
@@ -130,16 +163,19 @@ class MqttWrapper(Wrapper):
     """
 
     def __init__(self, params: MqttParams):
-        self._data_handle = None
-        self._client = mqtt_client.Client(params.client_id)
-        self._client.on_connect = self._on_connect
-        self._client.connect(params.broker, params.port)
+        self._client = None
+        self._params = params
     
-    def handle_measurement(self, measurement: Measurement):
+    def _do_handle_measurement(self, measurement: Measurement):
         for key, value in measurement.values.items():
             topic = "{}/{}".format(measurement.device_name, key)
             result = self._client.publish(topic, value)
             result.is_published()
+    
+    def init(self):
+        self._client = mqtt_client.Client(self._params.client_id)
+        self._client.on_connect = self._on_connect
+        self._client.connect(self._params.broker, self._params.port)
 
     def _on_connect(self, client, userdata, flags, rc):
         if rc != 0:
@@ -151,16 +187,19 @@ class InfluxDbWrapper(Wrapper):
     """
 
     def __init__(self, params: InfluxDbParams):
-        client = InfluxDBClient(
-            url=params.url, token=params.token, org=params.organisation)
-        self._write_api = client.write_api(
-            write_options=WriteOptions(batch_size=1))
-        self._bucket = params.bucket
+        self._write_api = None
+        self._params = params
 
-    def handle_measurement(self, measurement: Measurement):
+    def _do_handle_measurement(self, measurement: Measurement):
         point = Point(measurement.device_name)
         point.time(datetime.datetime.now(datetime.timezone.utc))
         for key, val in measurement.values.items():
             point.field(key, val)
-        self._write_api.write(self._bucket, record=point)
+        self._write_api.write(self._params.bucket, record=point)
+    
+    def init(self):
+        client = InfluxDBClient(
+            url=self._params.url, token=self._params.token, org=self._params.organisation)
+        self._write_api = client.write_api(
+            write_options=WriteOptions(batch_size=1))
 
