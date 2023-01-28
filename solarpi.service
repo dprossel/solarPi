@@ -6,6 +6,7 @@ EnvironmentFile=-/home/pi/solarPi/docker/solarpi.env
 Environment=PYTHONUNBUFFERED=1
 ExecStart = /usr/bin/python3 /home/pi/solarPi/docker/combined/main.py
 Restart=always
+RestartSec=10
 User=pi
 
 [Install]

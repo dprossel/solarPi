@@ -35,7 +35,7 @@ def main():
                 client.handle_measurement(meas)
 
         loop_time = time.time() - time_start
-        time.sleep(interval - loop_time)
+        time.sleep(max(interval - loop_time, 0))
 
 if __name__ == "__main__":
     main()

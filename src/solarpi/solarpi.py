@@ -138,7 +138,8 @@ class MqttWrapper(Wrapper):
     def handle_measurement(self, measurement: Measurement):
         for key, value in measurement.values.items():
             topic = "{}/{}".format(measurement.device_name, key)
-            self._client.publish(topic, value)
+            result = self._client.publish(topic, value)
+            result.is_published()
 
     def _on_connect(self, client, userdata, flags, rc):
         if rc != 0:
