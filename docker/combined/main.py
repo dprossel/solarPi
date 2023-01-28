@@ -21,32 +21,21 @@ def main():
     inverter2 = solarpi.KacoPowadorRs485(serial_port, int(env["INV2_ADDR"]), name="WR Schipf")
 
     readers = [energy_reader, inverter1, inverter2]
-
-    clients = []
-    try:
-        clients.append(solarpi.InfluxDbWrapper(influx_params))
-    except:
-        print("Could not connect to InfluxDb!")
     
-    try:
-        clients.append(solarpi.MqttWrapper(mqtt_params))
-    except:
-        print("Could not connect to MQTT!")
+    clients = []
+    clients.append(solarpi.InfluxDbWrapper(influx_params))
+    clients.append(solarpi.MqttWrapper(mqtt_params))
 
-    if len(clients) == 0:
-        print("Could not create any clients! Exiting")
-        sys.exit(1)
-
+    interval = int(env["INTERVAL"]) 
     while True:
-        time_start = time.process_time()
+        time_start = time.time()
         for reader in readers:
-            meas = solarpi.Measurement(reader.name(), reader.read_values())
+            meas = solarpi.Measurement(reader.name, reader.read_values())
             for client in clients:
                 client.handle_measurement(meas)
 
-        loop_time = time.process_time() - time_start
-        print(loop_time)
-        time.sleep(env["INTERVAL"] - loop_time)
+        loop_time = time.time() - time_start
+        time.sleep(interval - loop_time)
 
 if __name__ == "__main__":
     main()

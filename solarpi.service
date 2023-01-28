@@ -1,5 +1,5 @@
 [Unit]
-Description = SolarPi service for read values.
+Description = SolarPi service for reading values from inverters and SDM.
 
 [Service]
 EnvironmentFile=-/home/pi/solarPi/docker/solarpi.env

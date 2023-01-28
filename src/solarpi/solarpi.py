@@ -121,7 +121,7 @@ class EnergyReader(SerialReader):
 
 class Wrapper(ABC):
     @abc.abstractmethod
-    def subscribe(self, data: rx.Observable):
+    def handle_measurement(self, measurement: Measurement):
         pass
 
 
