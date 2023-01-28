@@ -47,7 +47,7 @@ class SerialReader(ABC):
     def name(self) -> str:
         return self._name
 
-    def read_values(self, retries: int = 1, lock: threading.Lock = None) -> dict:
+    def read_values(self, retries: int = 0, lock: threading.Lock = None) -> dict:
         if lock is None:
             result = self._do_read_values()
         else:
@@ -126,6 +126,9 @@ class Wrapper(ABC):
         self._num_retries = self._MAX_RETRIES
 
     def handle_measurement(self, measurement: Measurement):
+        if measurement.values is None:
+            return
+
         if self._do_init:
             try:
                 self.init()
@@ -163,6 +166,7 @@ class MqttWrapper(Wrapper):
     """
 
     def __init__(self, params: MqttParams):
+        super().__init__()
         self._client = None
         self._params = params
     
@@ -187,6 +191,7 @@ class InfluxDbWrapper(Wrapper):
     """
 
     def __init__(self, params: InfluxDbParams):
+        super().__init__()
         self._write_api = None
         self._params = params
 
