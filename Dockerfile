@@ -12,8 +12,6 @@ ENV PYTHONUNBUFFERED=1
 ENV PATH="/home/solarpi/.local/bin:${PATH}"
 
 WORKDIR /home/solarpi
-COPY --chown=solarpi:solarpi requirements.txt .
-RUN pip install --user -r requirements.txt
 COPY --chown=solarpi:solarpi . .
 RUN pip install --user . && rm -rf * .git* .cache
 
