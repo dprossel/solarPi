@@ -172,7 +172,7 @@ class MqttWrapper(Wrapper):
     
     def _do_handle_measurement(self, measurement: Measurement):
         for key, value in measurement.values.items():
-            topic = "{}/{}".format(measurement.device_name, key)
+            topic = "{}/{}".format(measurement.device_name.lower().replace(" ", "_"), key)
             result = self._client.publish(topic, value)
             result.is_published()
     
