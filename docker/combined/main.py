@@ -20,11 +20,17 @@ def main():
     inverter1 = solarpi.KacoPowadorRs485(serial_port, int(env["INV1_ADDR"]), name="WR Garage")
     inverter2 = solarpi.KacoPowadorRs485(serial_port, int(env["INV2_ADDR"]), name="WR Schipf")
 
-    serial_port2 = serial.Serial("/dev/serial/by-id/usb-1a86_USB2.0-Serial-if00-port0", 9600, parity="N", timeout=2)
-    inverter3 = solarpi.SerialReadout(serial_port2, name="WR_Balkon")
+    try:
+        serial_port2 = serial.Serial("/dev/serial/by-id/usb-1a86_USB2.0-Serial-if00-port0", 9600, parity="N", timeout=2)
+        inverter3 = solarpi.SerialReadout(serial_port2, name="WR_Balkon")
+    except:
+        inverter3 = None
 
-    readers = [energy_reader, inverter1, inverter2, inverter3]
-    
+    if not inverter3 is None:
+        readers = [energy_reader, inverter1, inverter2, inverter3]
+    else:
+        readers = [energy_reader, inverter1, inverter2]
+
     clients = []
     clients.append(solarpi.InfluxDbWrapper(influx_params))
     clients.append(solarpi.MqttWrapper(mqtt_params))
