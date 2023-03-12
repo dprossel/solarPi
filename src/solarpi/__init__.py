@@ -7,3 +7,4 @@ from .solarpi import EnergyReader
 from .solarpi import Wrapper
 from .solarpi import MqttWrapper
 from .solarpi import InfluxDbWrapper
+from .solarpi import SerialReadout
