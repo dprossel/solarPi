@@ -20,7 +20,10 @@ def main():
     inverter1 = solarpi.KacoPowadorRs485(serial_port, int(env["INV1_ADDR"]), name="WR Garage")
     inverter2 = solarpi.KacoPowadorRs485(serial_port, int(env["INV2_ADDR"]), name="WR Schipf")
 
-    readers = [energy_reader, inverter1, inverter2]
+    serial_port2 = serial.Serial("/dev/serial/by-id/usb-1a86_USB2.0-Serial-if00-port0", 9600, parity="N", timeout=2)
+    inverter3 = solarpi.SerialReadout(serial_port2, name="WR_Balkon")
+
+    readers = [energy_reader, inverter1, inverter2, inverter3]
     
     clients = []
     clients.append(solarpi.InfluxDbWrapper(influx_params))

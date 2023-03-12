@@ -99,6 +99,26 @@ class KacoPowadorRs485(SerialReader):
         return self._serialPort.write(str.encode("#{:02d}{}\r".format(self._bus_address, command)))
 
 
+class SerialReadout(SerialReader):
+    def __init__(self, serial: serial.Serial, name: str = None):
+        super().__init__(name)
+        self._serialPort = serial
+
+        if self._name is None:
+            self._name = "SerialReadout ({})".format(serial.port)
+
+    def _do_read_values(self) -> dict:
+        if not self._serialPort.is_open:
+            self._serialPort.open()
+        result = self._serialPort.read(self.RESPONSE_LENGTH)
+        if len(result) != self.RESPONSE_LENGTH:
+            #print("Wrong response length", len(result))
+            return None
+
+        values = result.split()[1:10]
+        return {"leistung": int(values[0])}
+
+
 class EnergyReader(SerialReader):
     """Read relevant energy values from SDM.
     """
