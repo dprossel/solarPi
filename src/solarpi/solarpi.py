@@ -116,7 +116,6 @@ class SerialReadout(SerialReader):
             return None
         
         value = result.split()[-1]
-        print(float(value))
         return {"leistung": float(value)}
 
 
