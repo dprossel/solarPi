@@ -115,10 +115,9 @@ class SerialReadout(SerialReader):
             #print("Wrong response length", len(result))
             return None
         
-        lines = result.split()
-        print(lines)
-
-        return {"leistung": float(result.strip())}
+        value = result.split()[-1]
+        print(float(value))
+        return {"leistung": float(value)}
 
 
 class EnergyReader(SerialReader):
