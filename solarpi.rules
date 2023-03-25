@@ -1,0 +1,2 @@
+#Restart solarpi service, when new device is plugged in.
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", ACTION="add", RUN+="systemctl restart solarpi"

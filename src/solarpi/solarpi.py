@@ -110,10 +110,13 @@ class SerialReadout(SerialReader):
     def _do_read_values(self) -> dict:
         if not self._serialPort.is_open:
             self._serialPort.open()
-        result = self._serialPort.readline()
+        result = self._serialPort.read(self._serialPort.inWaiting())
         if len(result) == 0:
             #print("Wrong response length", len(result))
             return None
+        
+        lines = result.split()
+        print(lines)
 
         return {"leistung": float(result.strip())}
 
