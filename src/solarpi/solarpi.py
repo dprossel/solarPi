@@ -116,7 +116,7 @@ class SerialReadout(SerialReader):
             return None
         
         value = result.split()[-1]
-        return {"leistung": float(value)}
+        return {"leistung": round(float(value))}
 
 
 class EnergyReader(SerialReader):
